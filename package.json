@@ -1,0 +1,75 @@
+{
+  "name": "@triyatna/n8n-nodes-4discord",
+  "version": "0.1.56",
+  "description": "Discord for n8n",
+  "author": "triyatna",
+  "homepage": "https://github.com/triyatna/n8n-nodes-discord",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/triyatna/n8n-nodes-discord.git"
+  },
+  "license": "MIT",
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "discord",
+    "discord-bot",
+    "webhook",
+    "interactions",
+    "slash-commands",
+    "discord-trigger",
+    "discord-listening",
+    "discord-events",
+    "discord-messages",
+    "discord-reactions"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -w -p tsconfig.json",
+    "lint": "echo \"skipping lint in this example\"",
+    "lintfix": "echo \"skipping lintfix in this example\"",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "n8n-core": ">=1.0.0",
+    "n8n-workflow": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "n8n-core": {
+      "optional": true
+    },
+    "n8n-workflow": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "n8n-core": "^1.115.0",
+    "n8n-workflow": "^1.113.0",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "form-data": "^4.0.0",
+    "tweetnacl": "^1.0.3",
+    "ws": "^8.18.3"
+  },
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/DiscordApp.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/DiscordTrigger.node.js"
+    ]
+  }
+}

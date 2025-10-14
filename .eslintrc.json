@@ -1,0 +1,23 @@
+{
+  "root": true,
+  "env": {
+    "es2022": true,
+    "node": true
+  },
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": false
+  },
+  "plugins": [
+    "@typescript-eslint"
+  ],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended"
+  ],
+  "rules": {
+    "no-constant-binary-expression": "off",
+    "@typescript-eslint/ban-ts-comment": "off",
+    "@typescript-eslint/no-explicit-any": "off"
+  }
+}
