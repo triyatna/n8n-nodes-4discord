@@ -1,8 +1,8 @@
-# Discord Trigger (for n8n)
+# Discord Listener (Trigger) - N8N Nodes Community
 
-A single node to receive **Discord Interactions** or listen to **all messages/events via a Listening**.
+A single node to receive **Discord Interactions** or listen to **Discord Listening** via socket.
 
-## repare the credential
+## Prepare the credential
 
 Create a **Discord App Credential** with the following fields:
 
@@ -22,7 +22,7 @@ Create a **Discord App Credential** with the following fields:
 
 ### Listening
 
-- `listeningIntents`, `listeningAutoReconnect`, `listeningIncludeSelf`, `selfFilterCacheSize`
+- `listeningIntents`, `emitEvents`, `listeningAutoReconnect`, `listeningIncludeSelf`, `selfFilterCacheSize`, `mentionDetect`, and other feature.
 
 ---
 

@@ -115,9 +115,12 @@ function computeMentionBotRobust(
 
   const content: string | undefined =
     typeof d?.content === "string" ? d.content : undefined;
+
+  // structured mentions array
   if (botUserId && Array.isArray(d?.mentions) && d.mentions.length) {
     if (d.mentions.some((u: any) => u?.id === botUserId)) return true;
   }
+  // inline <@id> or <@!id>
   if (botUserId && content) {
     if (
       content.includes(`<@${botUserId}>`) ||
@@ -126,9 +129,11 @@ function computeMentionBotRobust(
       return true;
     }
   }
+  // sometimes app id is used for mention
   if (applicationId && content) {
     if (content.includes(`<@${applicationId}>`)) return true;
   }
+  // reply to bot's message counts as addressing the bot
   if (considerReply && botUserId) {
     const isReply = d?.type === 19 || !!d?.message_reference;
     const refAuthorId = d?.referenced_message?.author?.id;
@@ -161,7 +166,7 @@ function buildEmitType(t: string): string | undefined {
     case "TYPING_START":
       return "typing_start";
     default:
-      return undefined;
+      return undefined; // skip READY/RESUMED and others by design
   }
 }
 
@@ -170,7 +175,7 @@ export class DiscordListenerTrigger implements INodeType {
   description: INodeTypeDescription = {
     displayName: "Discord Listener",
     name: "discordListenerTrigger",
-    icon: "file:../../icons/discord.svg",
+    icon: "file:icons/discord.svg",
     group: ["trigger"],
     version: 1,
     description: "Listen to Discord Listener Socket events.",
@@ -208,7 +213,7 @@ export class DiscordListenerTrigger implements INodeType {
         name: "emitEvents",
         type: "multiOptions",
         options: [
-          { name: "All", value: "all" },
+          { name: "All (except READY/RESUMED)", value: "all" },
           { name: "Message Create", value: "message_create" },
           { name: "Message Update", value: "message_update" },
           { name: "Message Delete", value: "message_delete" },
@@ -227,7 +232,8 @@ export class DiscordListenerTrigger implements INodeType {
           { name: "Typing Start", value: "typing_start" },
         ],
         default: ["message_create"],
-        description: "Select which events to ‘All’ emit. ",
+        description:
+          "Select which events to emit. 'All' still excludes READY/RESUMED.",
       },
       {
         displayName: "Auto Reconnect",
@@ -248,6 +254,8 @@ export class DiscordListenerTrigger implements INodeType {
         name: "onlyMentions",
         type: "boolean",
         default: false,
+        description:
+          "When ON, only messages that mention the bot are emitted. NOTE: DMs are auto-exempt if 'Allow DMs' is ON.",
       },
       {
         displayName: "Allow DMs",
@@ -652,11 +660,14 @@ export class DiscordListenerTrigger implements INodeType {
       const mention_bot =
         computeMentionBotRobust(d, botId, applicationId, true) ?? false;
 
+      // --- Filters ---
       if (!allowDMs && is_dm) return;
+
       if (includeGuildIds.size && guild_id && !includeGuildIds.has(guild_id))
         return;
       if (excludeGuildIds.size && guild_id && excludeGuildIds.has(guild_id))
         return;
+
       if (
         includeChannelIds.size &&
         channel_id &&
@@ -669,6 +680,7 @@ export class DiscordListenerTrigger implements INodeType {
         excludeChannelIds.has(String(channel_id))
       )
         return;
+
       if (
         includeUserIds.size &&
         d?.author?.id &&
@@ -682,8 +694,12 @@ export class DiscordListenerTrigger implements INodeType {
       )
         return;
 
-      if (onlyMentions && !mention_bot) return;
+      // *** Only-mentions effective logic ***
+      // If Allow DMs is ON and this is a DM, we EXEMPT the onlyMentions requirement (auto-bypass).
+      const onlyMentionsEffective = onlyMentions && !(allowDMs && is_dm);
+      if (onlyMentionsEffective && !mention_bot) return;
 
+      // Dedupe
       if (dedupeWindowSec > 0) {
         const key = `${emit_type}:${message_id ?? ""}:${channel_id ?? ""}`;
         const now = Date.now();
@@ -693,6 +709,7 @@ export class DiscordListenerTrigger implements INodeType {
         if (dedupeMap.size > 5000) dedupePrune();
       }
 
+      // Debounce edits
       if (emit_type === "message_update" && debounceEditsMs > 0 && message_id) {
         const last = editDebounce.get(message_id) ?? 0;
         const now = Date.now();
@@ -700,8 +717,8 @@ export class DiscordListenerTrigger implements INodeType {
         editDebounce.set(message_id, now);
       }
 
+      // self-filter
       if (!includeSelf && from_self) return;
-
       if (emit_type === "message_create" && from_self)
         rememberSelfMsg(message_id);
 
@@ -799,7 +816,7 @@ export class DiscordListenerTrigger implements INodeType {
 
     const shouldEmitBySelection = (t: string): boolean => {
       const emit_type = buildEmitType(t);
-      if (!emit_type) return false; // we never emit READY/RESUMED by design
+      if (!emit_type) return false; // never emit READY/RESUMED
       if (emitEvents.has("all")) return true;
       return emit_type ? emitEvents.has(emit_type) : false;
     };
@@ -834,18 +851,20 @@ export class DiscordListenerTrigger implements INodeType {
       ready = false;
     };
 
+    // ---- Connect
     const connect = () => {
-      ws = new WebSocket(GATEWAY_URL);
+      const wsLocal = new WebSocket(GATEWAY_URL);
+      ws = wsLocal;
 
-      ws.on("open", () => {
-        ws?.on("ping", () => {
+      wsLocal.on("open", () => {
+        wsLocal.on("ping", () => {
           try {
-            ws?.pong();
+            wsLocal.pong();
           } catch {}
         });
       });
 
-      ws.on("message", (data: RawData) => {
+      wsLocal.on("message", (data: RawData) => {
         try {
           const payload = JSON.parse(data.toString());
           const { op, t, s } = payload;
@@ -864,7 +883,7 @@ export class DiscordListenerTrigger implements INodeType {
               if (immediateHeartbeat) {
                 setTimeout(() => {
                   try {
-                    ws?.send(JSON.stringify(heartbeat()));
+                    wsLocal.send(JSON.stringify(heartbeat()));
                     heartbeatAcked = false;
                   } catch {}
                 }, startDelay);
@@ -873,23 +892,23 @@ export class DiscordListenerTrigger implements INodeType {
               heartbeatInterval = setInterval(() => {
                 if (!heartbeatAcked) {
                   try {
-                    ws?.close(4000, "Heartbeat not acknowledged");
+                    wsLocal.close(4000, "Heartbeat not acknowledged");
                   } catch {}
                   return;
                 }
                 heartbeatAcked = false;
                 try {
-                  ws?.send(JSON.stringify(heartbeat()));
+                  wsLocal.send(JSON.stringify(heartbeat()));
                 } catch {}
               }, Math.max(30000, interval));
 
               if (sessionId && resumeSessions) {
                 try {
-                  ws?.send(JSON.stringify(resume()));
+                  wsLocal.send(JSON.stringify(resume()));
                 } catch {}
               } else {
                 try {
-                  ws?.send(JSON.stringify(identify()));
+                  wsLocal.send(JSON.stringify(identify()));
                 } catch {}
               }
               break;
@@ -915,6 +934,7 @@ export class DiscordListenerTrigger implements INodeType {
 
               if (!shouldEmitBySelection(t)) break;
 
+              // self filtering
               if (!includeSelf && botId) {
                 if (t === "MESSAGE_CREATE") {
                   if (d?.author?.id === botId) {
@@ -952,7 +972,7 @@ export class DiscordListenerTrigger implements INodeType {
             }
             case 7: {
               try {
-                ws?.close(4000, "Server requested reconnect");
+                wsLocal.close(4000, "Server requested reconnect");
               } catch {}
               break;
             }
@@ -962,7 +982,7 @@ export class DiscordListenerTrigger implements INodeType {
               ready = false;
               setTimeout(() => {
                 try {
-                  ws?.send(JSON.stringify(identify()));
+                  wsLocal.send(JSON.stringify(identify()));
                 } catch {}
               }, 1200 + Math.floor(Math.random() * 600));
               break;
@@ -973,7 +993,7 @@ export class DiscordListenerTrigger implements INodeType {
         } catch {}
       });
 
-      ws.on("close", () => {
+      wsLocal.on("close", () => {
         teardown();
         if (!closed && autoReconnect) {
           attempt++;
@@ -982,7 +1002,7 @@ export class DiscordListenerTrigger implements INodeType {
         }
       });
 
-      ws.on("error", () => {});
+      wsLocal.on("error", () => {});
     };
 
     connect();
