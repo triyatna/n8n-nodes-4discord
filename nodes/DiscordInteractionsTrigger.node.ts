@@ -14,7 +14,7 @@ export class DiscordInteractionsTrigger implements INodeType {
   description: INodeTypeDescription = {
     displayName: "Discord Interactions",
     name: "discordInteractionsTrigger",
-    icon: "file:icons/discord.svg",
+    icon: "file:../../icons/discord.svg",
     group: ["trigger"],
     version: 1,
     description: "Receive Discord Interactions via HTTP Webhook.",

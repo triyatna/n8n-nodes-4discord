@@ -80,7 +80,7 @@ export class Discord implements INodeType {
   description: INodeTypeDescription = {
     displayName: "Discord",
     name: "discord",
-    icon: "file:icons/discord.svg",
+    icon: "file:../../icons/discord.svg",
     group: ["transform"],
     version: 1,
     subtitle: '={{$parameter["resource"] + ": " + $parameter["operation"]}}',
