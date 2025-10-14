@@ -204,12 +204,14 @@ export class DiscordListenerTrigger implements INodeType {
       },
       {
         displayName: "Auto Reconnect",
+        noDataExpression: true,
         name: "listeningAutoReconnect",
         type: "boolean",
         default: true,
       },
       {
         displayName: "Include Bot's Own Events",
+        noDataExpression: true,
         name: "listeningIncludeSelf",
         type: "boolean",
         default: false,
@@ -217,6 +219,7 @@ export class DiscordListenerTrigger implements INodeType {
       },
       {
         displayName: "Only Messages That Mention Bot",
+        noDataExpression: true,
         name: "onlyMentions",
         type: "boolean",
         default: false,
@@ -225,11 +228,11 @@ export class DiscordListenerTrigger implements INodeType {
       },
       {
         displayName: "Allow DMs",
+        noDataExpression: true,
         name: "allowDMs",
         type: "boolean",
         default: true,
       },
-
       {
         displayName: "Additional Fields",
         name: "additionalFields",
@@ -281,7 +284,6 @@ export class DiscordListenerTrigger implements INodeType {
           },
         ],
       },
-
       {
         displayName: "Advanced Options",
         name: "advanced",
@@ -711,20 +713,62 @@ export class DiscordListenerTrigger implements INodeType {
         });
       }
 
+      const message_url = is_dm
+        ? channel_id && message_id
+          ? `https://discord.com/channels/@me/${channel_id}/${message_id}`
+          : undefined
+        : guild_id && channel_id && message_id
+        ? `https://discord.com/channels/${guild_id}/${channel_id}/${message_id}`
+        : undefined;
+
+      const author = d?.author
+        ? {
+            id: d.author.id,
+            username: d.author.username,
+            global_name: d.author.global_name,
+            bot: !!d.author.bot,
+            avatar: d.author.avatar,
+          }
+        : undefined;
+
+      const member = d?.member
+        ? {
+            nick: d.member.nick,
+            roles: Array.isArray(d.member.roles) ? d.member.roles : undefined,
+            pending: d.member.pending,
+            premium_since: d.member.premium_since,
+            communication_disabled_until: d.member.communication_disabled_until,
+          }
+        : undefined;
+
+      const context = is_dm
+        ? {
+            kind: "dm" as const,
+            channel: { id: channel_id ?? undefined },
+            message_url,
+          }
+        : {
+            kind: "guild" as const,
+            guild: { id: guild_id ?? undefined },
+            channel: { id: channel_id ?? undefined },
+            message_url,
+          };
+
       return {
         json: {
           event: t,
           emit_type,
+          context,
           meta: {
             receivedAt: new Date().toISOString(),
             source: "listener",
             seq: s ?? null,
             sessionId: sessionId ?? undefined,
-            guild_id: guild_id ?? undefined,
-            channel_id: channel_id ?? undefined,
-            message_id: message_id ?? undefined,
-            author_id: d?.author?.id ?? undefined,
             is_dm,
+          },
+          actor: {
+            author,
+            member,
           },
           flags: {
             from_self,
