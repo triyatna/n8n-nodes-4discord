@@ -158,6 +158,7 @@ export class DiscordListenerTrigger implements INodeType {
       {
         displayName: "Listening Intents",
         name: "listeningIntents",
+        noDataExpression: true,
         type: "multiOptions",
         options: [
           { name: "Guilds", value: INTENTS.GUILDS },
@@ -179,6 +180,7 @@ export class DiscordListenerTrigger implements INodeType {
       },
       {
         displayName: "Emit Events",
+        noDataExpression: true,
         name: "emitEvents",
         type: "multiOptions",
         options: [
@@ -294,18 +296,21 @@ export class DiscordListenerTrigger implements INodeType {
           {
             displayName: "Immediate Heartbeat",
             name: "immediateHeartbeat",
+            noDataExpression: true,
             type: "boolean",
             default: true,
           },
           {
             displayName: "Resume Sessions",
             name: "resumeSessions",
+            noDataExpression: true,
             type: "boolean",
             default: true,
           },
           {
             displayName: "Prefetch Bot ID",
             name: "prefetchBotId",
+            noDataExpression: true,
             type: "boolean",
             default: true,
           },
@@ -362,12 +367,14 @@ export class DiscordListenerTrigger implements INodeType {
           {
             displayName: "Resolve Mentions",
             name: "resolveMentions",
+            noDataExpression: true,
             type: "boolean",
             default: true,
           },
           {
             displayName: "Parse Command",
             name: "parseCommand",
+            noDataExpression: true,
             type: "boolean",
             default: false,
           },
@@ -381,6 +388,7 @@ export class DiscordListenerTrigger implements INodeType {
           {
             displayName: "Allow Mention Prefix",
             name: "allowMentionPrefix",
+            noDataExpression: true,
             type: "boolean",
             default: true,
             displayOptions: { show: { parseCommand: [true] } },
@@ -388,6 +396,7 @@ export class DiscordListenerTrigger implements INodeType {
           {
             displayName: "Include Attachments",
             name: "includeAttachments",
+            noDataExpression: true,
             type: "boolean",
             default: true,
           },
