@@ -50,7 +50,8 @@ export class DiscordInteractionsTrigger implements INodeType {
         httpMethod: "POST",
         responseMode: "onReceived",
         // URL efektif: https://<host>/webhook/<pathSecret>/<pathSuffix>
-        path: '={{$parameter["pathSecret"] + "/" + $parameter["pathSuffix"]}}',
+        path: '={{$parameter["pathSecret"] + "/discord-interactions"}}',
+        isFullPath: true,
       },
     ],
     properties: [
@@ -60,14 +61,6 @@ export class DiscordInteractionsTrigger implements INodeType {
         type: "string",
         default: "secret-segment",
         description: "A random/secret segment in the middle of the URL.",
-      },
-      {
-        displayName: "Path Suffix",
-        name: "pathSuffix",
-        type: "string",
-        default: "discord-interactions",
-        description:
-          "The last segment of the path. Usually left at the default: discord-interactions",
       },
       {
         displayName: "Options",
