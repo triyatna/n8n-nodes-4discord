@@ -44,13 +44,17 @@ export class DiscordTrigger implements INodeType {
     defaults: { name: "Discord Trigger" },
     inputs: [],
     outputs: ["main"],
+
+    // Unified credential
     credentials: [{ name: "discordApp", required: true }],
+
+    // IMPORTANT: Make path undefined when mode !== interactions, so the Webhook URLs panel disappears.
     webhooks: [
       {
         name: "default",
         httpMethod: "POST",
         responseMode: "onReceived",
-        path: '={{$parameter["path"]}}',
+        path: '={{ $parameter["mode"] === "interactions" ? $parameter["path"] : undefined }}',
       },
     ],
 
@@ -207,7 +211,7 @@ export class DiscordTrigger implements INodeType {
         },
       },
 
-      // ---- Listening Socket ----
+      // ---- Listening (Socket Gateway) ----
       {
         displayName: "Listening Intents",
         name: "listeningIntents",
@@ -262,6 +266,7 @@ export class DiscordTrigger implements INodeType {
     ],
   };
 
+  // Only advertise a webhook when mode === interactions (affects activation/runtime)
   webhookMethods = {
     default: {
       async checkExists(this: IHookFunctions): Promise<boolean> {
@@ -348,9 +353,11 @@ export class DiscordTrigger implements INodeType {
       }
     }
 
+    // Optional: HMAC forwarder verification
     if (!hasSigHeaders && verifyForwardedSecret && sharedSecretFromCred) {
       const tsFwd = String(headers["x-timestamp"] || "");
       const sigFwd = String(headers["x-signature"] || "");
+      // @ts-ignore
       const raw = (request as any).rawBody as Buffer | undefined;
       if (!raw || !tsFwd || !sigFwd) {
         response
@@ -367,6 +374,7 @@ export class DiscordTrigger implements INodeType {
       }
     }
 
+    // Discord Ed25519 verification (recommended ON)
     if (verifyInteractions && hasSigHeaders) {
       if (!publicKeyFromCred) {
         response
@@ -374,6 +382,7 @@ export class DiscordTrigger implements INodeType {
           .json({ error: "missing_public_key_in_credentials" });
         return { noWebhookResponse: true };
       }
+      // @ts-ignore
       const raw = (request as any).rawBody as Buffer | undefined;
       const ts = String(headers["x-signature-timestamp"] || "");
       const sigHex = String(headers["x-signature-ed25519"] || "");
@@ -430,6 +439,7 @@ export class DiscordTrigger implements INodeType {
       if (t === 1) {
         response.json({ type: 1 }); // PONG
       } else {
+        // final response mode
         const override = interactionAutoResponse;
         let mode: InteractionAutoResponse;
         if (override === "none") {
@@ -451,6 +461,7 @@ export class DiscordTrigger implements INodeType {
           });
         else response.json({ type: 5 });
 
+        // Fire-and-forget auto follow-up
         if (this.getNodeParameter("autoFollowup", 0) && payload.followupUrl) {
           const content = this.getNodeParameter(
             "autoFollowupContent",
@@ -475,6 +486,7 @@ export class DiscordTrigger implements INodeType {
       return { noWebhookResponse: true, workflowData: [items] };
     }
 
+    // Non-interaction
     const items = toItems(payload, splitIntoItems);
     if (this.getNodeParameter("responseMode", 0) === "onReceived") {
       const response = this.getResponseObject();
@@ -614,6 +626,7 @@ export class DiscordTrigger implements INodeType {
                 botId = d?.user?.id;
               }
 
+              // Self-filtering to avoid loops/spam
               if (!includeSelf && botId) {
                 if (t === "MESSAGE_CREATE") {
                   if (d?.author?.id === botId) {
@@ -645,6 +658,7 @@ export class DiscordTrigger implements INodeType {
                 }
               }
 
+              // Emit events we care about
               if (
                 t === "MESSAGE_CREATE" ||
                 t === "MESSAGE_UPDATE" ||
