@@ -7,7 +7,6 @@ import type {
 } from "n8n-workflow";
 import WebSocket, { RawData } from "ws";
 
-// ---------- Constants ----------
 const GATEWAY_URL = "wss://gateway.discord.gg/?v=10&encoding=json";
 
 const INTENTS = {
@@ -26,7 +25,6 @@ const DEFAULT_INTENTS =
   INTENTS.MESSAGE_CONTENT |
   INTENTS.GUILD_MESSAGE_REACTIONS;
 
-// ---------- Helpers (pure) ----------
 function parseIdList(input?: string): Set<string> {
   if (typeof input !== "string") return new Set();
   return new Set(
@@ -59,49 +57,31 @@ function parseCommandFromContent(
   }
 ): { used: boolean; name?: string; args_raw?: string; args?: string[] } {
   if (!content) return { used: false };
-
   const prefix = (opts.prefix ?? "!").trim();
   const allowMentionPrefix = opts.allowMentionPrefix ?? true;
-
-  const mentionPrefixes: string[] = [];
+  const mp: string[] = [];
   if (allowMentionPrefix && (opts.botUserId || opts.applicationId)) {
-    if (opts.botUserId) {
-      mentionPrefixes.push(`<@${opts.botUserId}>`, `<@!${opts.botUserId}>`);
-    }
-    if (opts.applicationId) {
-      mentionPrefixes.push(`<@${opts.applicationId}>`);
-    }
+    if (opts.botUserId)
+      mp.push(`<@${opts.botUserId}>`, `<@!${opts.botUserId}>`);
+    if (opts.applicationId) mp.push(`<@${opts.applicationId}>`);
   }
-
   const trimmed = content.trimStart();
-
-  let head = "";
   let rest = "";
-
-  if (prefix && trimmed.startsWith(prefix)) {
-    head = prefix;
+  if (prefix && trimmed.startsWith(prefix))
     rest = trimmed.slice(prefix.length).trimStart();
-  } else {
-    const mp = mentionPrefixes.find((m) => trimmed.startsWith(m));
-    if (mp) {
-      head = mp;
-      rest = trimmed.slice(mp.length).trimStart();
-    } else {
-      return { used: false };
-    }
+  else {
+    const m = mp.find((s) => trimmed.startsWith(s));
+    if (!m) return { used: false };
+    rest = trimmed.slice(m.length).trimStart();
   }
-
   if (!rest) return { used: false };
-  const match = rest.match(/^(\S+)\s*(.*)$/s);
-  const name = match?.[1] || "";
-  const args_raw = match?.[2] || "";
+  const m = rest.match(/^(\S+)\s*(.*)$/s);
+  const name = m?.[1] || "";
+  const args_raw = m?.[2] || "";
   const args: string[] = [];
   const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(args_raw))) {
-    args.push(m[1] ?? m[2] ?? m[3]);
-  }
-
+  let g: RegExpExecArray | null;
+  while ((g = re.exec(args_raw))) args.push(g[1] ?? g[2] ?? g[3]);
   return { used: true, name, args_raw, args };
 }
 
@@ -112,34 +92,26 @@ function computeMentionBotRobust(
   considerReply = true
 ): boolean | undefined {
   if (!botUserId && !applicationId) return undefined;
-
   const content: string | undefined =
     typeof d?.content === "string" ? d.content : undefined;
-
-  // structured mentions array
   if (botUserId && Array.isArray(d?.mentions) && d.mentions.length) {
     if (d.mentions.some((u: any) => u?.id === botUserId)) return true;
   }
-  // inline <@id> or <@!id>
   if (botUserId && content) {
     if (
       content.includes(`<@${botUserId}>`) ||
       content.includes(`<@!${botUserId}>`)
-    ) {
+    )
       return true;
-    }
   }
-  // sometimes app id is used for mention
   if (applicationId && content) {
     if (content.includes(`<@${applicationId}>`)) return true;
   }
-  // reply to bot's message counts as addressing the bot
   if (considerReply && botUserId) {
     const isReply = d?.type === 19 || !!d?.message_reference;
     const refAuthorId = d?.referenced_message?.author?.id;
     if (isReply && refAuthorId && refAuthorId === botUserId) return true;
   }
-
   return false;
 }
 
@@ -166,11 +138,10 @@ function buildEmitType(t: string): string | undefined {
     case "TYPING_START":
       return "typing_start";
     default:
-      return undefined; // skip READY/RESUMED and others by design
+      return undefined;
   }
 }
 
-// ---------- Node ----------
 export class DiscordListenerTrigger implements INodeType {
   description: INodeTypeDescription = {
     displayName: "Discord Listener",
@@ -205,8 +176,6 @@ export class DiscordListenerTrigger implements INodeType {
           INTENTS.MESSAGE_CONTENT,
           INTENTS.GUILD_MESSAGE_REACTIONS,
         ],
-        description:
-          "Enable MESSAGE CONTENT intent in the Dev Portal if you need message content.",
       },
       {
         displayName: "Emit Events",
@@ -232,8 +201,6 @@ export class DiscordListenerTrigger implements INodeType {
           { name: "Typing Start", value: "typing_start" },
         ],
         default: ["message_create"],
-        description:
-          "Select which events to emit. 'All' still excludes READY/RESUMED.",
       },
       {
         displayName: "Auto Reconnect",
@@ -246,8 +213,7 @@ export class DiscordListenerTrigger implements INodeType {
         name: "listeningIncludeSelf",
         type: "boolean",
         default: false,
-        description:
-          "If off (default), events created by the bot itself are filtered to avoid loops/spam.",
+        description: "Filter out the bot's own events when OFF (default).",
       },
       {
         displayName: "Only Messages That Mention Bot",
@@ -255,7 +221,7 @@ export class DiscordListenerTrigger implements INodeType {
         type: "boolean",
         default: false,
         description:
-          "When ON, only messages that mention the bot are emitted. NOTE: DMs are auto-exempt if 'Allow DMs' is ON.",
+          "When ON, only messages that mention the bot are emitted. DMs are auto-exempt if Allow DMs is ON.",
       },
       {
         displayName: "Allow DMs",
@@ -263,48 +229,59 @@ export class DiscordListenerTrigger implements INodeType {
         type: "boolean",
         default: true,
       },
+
       {
-        displayName: "Include Guild IDs",
-        name: "includeGuildIds",
-        type: "string",
-        default: "",
-        description: "Comma/space/newline separated IDs.",
+        displayName: "Additional Fields",
+        name: "additionalFields",
+        type: "collection",
+        placeholder: "Add Field",
+        default: {},
+        options: [
+          {
+            displayName: "Include Guild IDs",
+            name: "includeGuildIds",
+            type: "string",
+            default: "",
+            description: "Comma/space/newline separated.",
+          },
+          {
+            displayName: "Exclude Guild IDs",
+            name: "excludeGuildIds",
+            type: "string",
+            default: "",
+            description: "Comma/space/newline separated.",
+          },
+          {
+            displayName: "Include Channel IDs",
+            name: "includeChannelIds",
+            type: "string",
+            default: "",
+            description: "Comma/space/newline separated.",
+          },
+          {
+            displayName: "Exclude Channel IDs",
+            name: "excludeChannelIds",
+            type: "string",
+            default: "",
+            description: "Comma/space/newline separated.",
+          },
+          {
+            displayName: "Include User IDs",
+            name: "includeUserIds",
+            type: "string",
+            default: "",
+            description: "Comma/space/newline separated.",
+          },
+          {
+            displayName: "Exclude User IDs",
+            name: "excludeUserIds",
+            type: "string",
+            default: "",
+            description: "Comma/space/newline separated.",
+          },
+        ],
       },
-      {
-        displayName: "Exclude Guild IDs",
-        name: "excludeGuildIds",
-        type: "string",
-        default: "",
-        description: "Comma/space/newline separated IDs.",
-      },
-      {
-        displayName: "Include Channel IDs",
-        name: "includeChannelIds",
-        type: "string",
-        default: "",
-        description: "Comma/space/newline separated IDs.",
-      },
-      {
-        displayName: "Exclude Channel IDs",
-        name: "excludeChannelIds",
-        type: "string",
-        default: "",
-        description: "Comma/space/newline separated IDs.",
-      },
-      {
-        displayName: "Include User IDs",
-        name: "includeUserIds",
-        type: "string",
-        default: "",
-        description: "Comma/space/newline separated IDs.",
-      },
-      {
-        displayName: "Exclude User IDs",
-        name: "excludeUserIds",
-        type: "string",
-        default: "",
-        description: "Comma/space/newline separated IDs.",
-      },
+
       {
         displayName: "Advanced Options",
         name: "advanced",
@@ -337,7 +314,6 @@ export class DiscordListenerTrigger implements INodeType {
             default: 0,
             typeOptions: { minValue: 0, maxValue: 5000 },
           },
-
           {
             displayName: "Dedupe Window (sec)",
             name: "dedupeWindowSec",
@@ -359,7 +335,6 @@ export class DiscordListenerTrigger implements INodeType {
             default: 0,
             typeOptions: { minValue: 0, maxValue: 60000 },
           },
-
           {
             displayName: "Backfill On Start",
             name: "enableBackfill",
@@ -382,7 +357,6 @@ export class DiscordListenerTrigger implements INodeType {
             typeOptions: { minValue: 1, maxValue: 100 },
             displayOptions: { show: { enableBackfill: [true] } },
           },
-
           {
             displayName: "Resolve Mentions",
             name: "resolveMentions",
@@ -409,7 +383,6 @@ export class DiscordListenerTrigger implements INodeType {
             default: true,
             displayOptions: { show: { parseCommand: [true] } },
           },
-
           {
             displayName: "Include Attachments",
             name: "includeAttachments",
@@ -429,16 +402,13 @@ export class DiscordListenerTrigger implements INodeType {
   };
 
   async trigger(this: ITriggerFunctions): Promise<ITriggerResponse> {
-    // ---- Credentials & base info ----
     const cred = await (this as any).getCredentials("discordApp");
     const tokenRaw = (cred?.botToken as string) || "";
-    if (!tokenRaw) {
+    if (!tokenRaw)
       throw new Error("Bot Token is required in 'Discord App Credential'.");
-    }
     const token = tokenRaw.startsWith("Bot ") ? tokenRaw : `Bot ${tokenRaw}`;
     const applicationId: string | undefined = cred?.applicationId || undefined;
 
-    // ---- Parameters ----
     const intentsSelected = this.getNodeParameter(
       "listeningIntents",
       0
@@ -464,24 +434,14 @@ export class DiscordListenerTrigger implements INodeType {
     const onlyMentions = this.getNodeParameter("onlyMentions", 0) as boolean;
     const allowDMs = this.getNodeParameter("allowDMs", 0) as boolean;
 
-    const includeGuildIds = parseIdList(
-      this.getNodeParameter("includeGuildIds", 0) as string
-    );
-    const excludeGuildIds = parseIdList(
-      this.getNodeParameter("excludeGuildIds", 0) as string
-    );
-    const includeChannelIds = parseIdList(
-      this.getNodeParameter("includeChannelIds", 0) as string
-    );
-    const excludeChannelIds = parseIdList(
-      this.getNodeParameter("excludeChannelIds", 0) as string
-    );
-    const includeUserIds = parseIdList(
-      this.getNodeParameter("includeUserIds", 0) as string
-    );
-    const excludeUserIds = parseIdList(
-      this.getNodeParameter("excludeUserIds", 0) as string
-    );
+    const additional =
+      (this.getNodeParameter("additionalFields", 0, {}) as any) || {};
+    const includeGuildIds = parseIdList(additional.includeGuildIds);
+    const excludeGuildIds = parseIdList(additional.excludeGuildIds);
+    const includeChannelIds = parseIdList(additional.includeChannelIds);
+    const excludeChannelIds = parseIdList(additional.excludeChannelIds);
+    const includeUserIds = parseIdList(additional.includeUserIds);
+    const excludeUserIds = parseIdList(additional.excludeUserIds);
 
     const advanced = (this.getNodeParameter("advanced", 0, {}) as any) || {};
     const immediateHeartbeat = !!advanced.immediateHeartbeat;
@@ -490,23 +450,19 @@ export class DiscordListenerTrigger implements INodeType {
     const heartbeatJitterMs = Number.isFinite(advanced.heartbeatJitterMs)
       ? Number(advanced.heartbeatJitterMs)
       : 0;
-
     const dedupeWindowSec =
       Number.isFinite(advanced.dedupeWindowSec) && advanced.dedupeWindowSec >= 0
         ? Number(advanced.dedupeWindowSec)
         : 10;
-
     const maxEmitPerSecond =
       Number.isFinite(advanced.maxEmitPerSecond) &&
       advanced.maxEmitPerSecond > 0
         ? Number(advanced.maxEmitPerSecond)
         : 20;
-
     const debounceEditsMs =
       Number.isFinite(advanced.debounceEditsMs) && advanced.debounceEditsMs >= 0
         ? Number(advanced.debounceEditsMs)
         : 0;
-
     const enableBackfill = !!advanced.enableBackfill;
     const backfillChannelIds = parseIdList(
       advanced.backfillChannelIds as string
@@ -517,7 +473,6 @@ export class DiscordListenerTrigger implements INodeType {
       advanced.backfillLimitPerChannel <= 100
         ? Number(advanced.backfillLimitPerChannel)
         : 10;
-
     const resolveMentions = advanced.resolveMentions !== false;
     const parseCommand = !!advanced.parseCommand;
     const commandPrefix =
@@ -526,16 +481,13 @@ export class DiscordListenerTrigger implements INodeType {
         ? advanced.commandPrefix
         : "!";
     const allowMentionPrefix = advanced.allowMentionPrefix !== false;
-
     const includeAttachments = advanced.includeAttachments !== false;
-
     const selfFilterCacheSize =
       Number.isFinite(advanced.selfFilterCacheSize) &&
       advanced.selfFilterCacheSize >= 100
         ? Number(advanced.selfFilterCacheSize)
         : 2000;
 
-    // ---- Runtime state ----
     let ws: WebSocket | undefined;
     let heartbeatInterval: NodeJS.Timeout | undefined;
     let heartbeatAcked = true;
@@ -554,16 +506,13 @@ export class DiscordListenerTrigger implements INodeType {
           json: true,
         });
         if (me?.id) botId = String(me.id);
-      } catch {
-        /* ignore */
-      }
+      } catch {}
     }
 
     const selfMsgIds = new Set<string>();
     const selfMsgQueue: string[] = [];
     const rememberSelfMsg = (id?: string) => {
-      if (!id) return;
-      if (selfMsgIds.has(id)) return;
+      if (!id || selfMsgIds.has(id)) return;
       selfMsgIds.add(id);
       selfMsgQueue.push(id);
       while (selfMsgQueue.length > selfFilterCacheSize) {
@@ -583,11 +532,11 @@ export class DiscordListenerTrigger implements INodeType {
     const emitQueue: INodeExecutionData[] = [];
     let lastEmit = 0;
     let emitTimer: NodeJS.Timeout | undefined;
+
     const emitDrain = () => {
       const interval = Math.max(1, Math.floor(1000 / maxEmitPerSecond));
       const now = Date.now();
-      if (emitQueue.length === 0) return;
-
+      if (!emitQueue.length) return;
       if (now - lastEmit >= interval) {
         const item = emitQueue.shift()!;
         this.emit([[item]]);
@@ -599,10 +548,8 @@ export class DiscordListenerTrigger implements INodeType {
       emitTimer = setInterval(() => {
         try {
           emitDrain();
-        } catch {
-          /* ignore */
-        }
-        if (emitQueue.length === 0) {
+        } catch {}
+        if (!emitQueue.length) {
           clearInterval(emitTimer!);
           emitTimer = undefined;
         }
@@ -628,14 +575,11 @@ export class DiscordListenerTrigger implements INodeType {
             msgs.reverse();
             for (const m of msgs) {
               if (m?.author?.id && m.author.id === botId) rememberSelfMsg(m.id);
-
               const out = buildMessageItem("MESSAGE_CREATE", null, m, true);
               if (out) pushEmit(out);
             }
           }
-        } catch {
-          /* ignore */
-        }
+        } catch {}
       }
     };
 
@@ -655,12 +599,10 @@ export class DiscordListenerTrigger implements INodeType {
         d?.id ?? d?.message_id ?? d?.message?.id ?? d?.referenced_message?.id;
 
       const from_self = !!(botId && d?.author?.id === botId);
-
       const rawContent = typeof d?.content === "string" ? d.content : "";
       const mention_bot =
         computeMentionBotRobust(d, botId, applicationId, true) ?? false;
 
-      // --- Filters ---
       if (!allowDMs && is_dm) return;
 
       if (includeGuildIds.size && guild_id && !includeGuildIds.has(guild_id))
@@ -694,12 +636,9 @@ export class DiscordListenerTrigger implements INodeType {
       )
         return;
 
-      // *** Only-mentions effective logic ***
-      // If Allow DMs is ON and this is a DM, we EXEMPT the onlyMentions requirement (auto-bypass).
       const onlyMentionsEffective = onlyMentions && !(allowDMs && is_dm);
       if (onlyMentionsEffective && !mention_bot) return;
 
-      // Dedupe
       if (dedupeWindowSec > 0) {
         const key = `${emit_type}:${message_id ?? ""}:${channel_id ?? ""}`;
         const now = Date.now();
@@ -709,7 +648,6 @@ export class DiscordListenerTrigger implements INodeType {
         if (dedupeMap.size > 5000) dedupePrune();
       }
 
-      // Debounce edits
       if (emit_type === "message_update" && debounceEditsMs > 0 && message_id) {
         const last = editDebounce.get(message_id) ?? 0;
         const now = Date.now();
@@ -717,7 +655,6 @@ export class DiscordListenerTrigger implements INodeType {
         editDebounce.set(message_id, now);
       }
 
-      // self-filter
       if (!includeSelf && from_self) return;
       if (emit_type === "message_create" && from_self)
         rememberSelfMsg(message_id);
@@ -728,26 +665,22 @@ export class DiscordListenerTrigger implements INodeType {
       const mentions: Array<{ type: string; id?: string; name?: string }> = [];
       if (resolveMentions) {
         if (Array.isArray(d?.mentions)) {
-          for (const u of d.mentions) {
-            if (!u?.id) continue;
-            mentions.push({
-              type: "user",
-              id: String(u.id),
-              name: u?.username,
-            });
-          }
+          for (const u of d.mentions)
+            if (u?.id)
+              mentions.push({
+                type: "user",
+                id: String(u.id),
+                name: u?.username,
+              });
         }
         if (Array.isArray(d?.mention_roles)) {
-          for (const rid of d.mention_roles) {
+          for (const rid of d.mention_roles)
             mentions.push({ type: "role", id: String(rid) });
-          }
         }
         if (content) {
           const chMatches = content.match(/<#(\d+)>/g) || [];
-          for (const m of chMatches) {
-            const id = m.replace(/[<#>]/g, "");
-            mentions.push({ type: "channel", id });
-          }
+          for (const m of chMatches)
+            mentions.push({ type: "channel", id: m.replace(/[<#>]/g, "") });
           if (content.includes("@everyone"))
             mentions.push({ type: "everyone" });
           if (content.includes("@here")) mentions.push({ type: "here" });
@@ -756,7 +689,7 @@ export class DiscordListenerTrigger implements INodeType {
 
       let attachments:
         | Array<{ id: string; filename: string; url: string; size?: number }>
-        | undefined = undefined;
+        | undefined;
       if (includeAttachments && Array.isArray(d?.attachments)) {
         attachments = d.attachments.map((a: any) => ({
           id: String(a?.id ?? ""),
@@ -778,7 +711,7 @@ export class DiscordListenerTrigger implements INodeType {
         });
       }
 
-      const item: INodeExecutionData = {
+      return {
         json: {
           event: t,
           emit_type,
@@ -811,12 +744,11 @@ export class DiscordListenerTrigger implements INodeType {
           raw: d,
         },
       };
-      return item;
     };
 
     const shouldEmitBySelection = (t: string): boolean => {
       const emit_type = buildEmitType(t);
-      if (!emit_type) return false; // never emit READY/RESUMED
+      if (!emit_type) return false;
       if (emitEvents.has("all")) return true;
       return emit_type ? emitEvents.has(emit_type) : false;
     };
@@ -851,7 +783,6 @@ export class DiscordListenerTrigger implements INodeType {
       ready = false;
     };
 
-    // ---- Connect
     const connect = () => {
       const wsLocal = new WebSocket(GATEWAY_URL);
       ws = wsLocal;
@@ -873,13 +804,10 @@ export class DiscordListenerTrigger implements INodeType {
 
           switch (op) {
             case 10: {
-              // HELLO
               const interval = d.heartbeat_interval;
               if (heartbeatInterval) clearInterval(heartbeatInterval);
               heartbeatAcked = true;
-
               const startDelay = Math.max(0, heartbeatJitterMs | 0);
-
               if (immediateHeartbeat) {
                 setTimeout(() => {
                   try {
@@ -888,7 +816,6 @@ export class DiscordListenerTrigger implements INodeType {
                   } catch {}
                 }, startDelay);
               }
-
               heartbeatInterval = setInterval(() => {
                 if (!heartbeatAcked) {
                   try {
@@ -901,7 +828,6 @@ export class DiscordListenerTrigger implements INodeType {
                   wsLocal.send(JSON.stringify(heartbeat()));
                 } catch {}
               }, Math.max(30000, interval));
-
               if (sessionId && resumeSessions) {
                 try {
                   wsLocal.send(JSON.stringify(resume()));
@@ -931,10 +857,8 @@ export class DiscordListenerTrigger implements INodeType {
                 attempt = 0;
                 break;
               }
-
               if (!shouldEmitBySelection(t)) break;
 
-              // self filtering
               if (!includeSelf && botId) {
                 if (t === "MESSAGE_CREATE") {
                   if (d?.author?.id === botId) {
@@ -953,7 +877,7 @@ export class DiscordListenerTrigger implements INodeType {
                     const filtered = d.ids.filter(
                       (id: string) => !selfMsgIds.has(id)
                     );
-                    if (filtered.length === 0) break;
+                    if (!filtered.length) break;
                     d = { ...d, ids: filtered };
                   }
                 } else if (
@@ -977,7 +901,6 @@ export class DiscordListenerTrigger implements INodeType {
               break;
             }
             case 9: {
-              // INVALID_SESSION
               sessionId = undefined;
               ready = false;
               setTimeout(() => {
@@ -997,8 +920,7 @@ export class DiscordListenerTrigger implements INodeType {
         teardown();
         if (!closed && autoReconnect) {
           attempt++;
-          const delay = nextDelay();
-          setTimeout(connect, delay);
+          setTimeout(connect, nextDelay());
         }
       });
 
