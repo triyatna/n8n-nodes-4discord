@@ -1,12 +1,12 @@
 {
   "name": "@triyatna/n8n-nodes-4discord",
-  "version": "0.1.64",
+  "version": "0.1.65",
   "description": "Discord for n8n",
   "author": "triyatna",
-  "homepage": "https://github.com/triyatna/n8n-nodes-discord",
+  "homepage": "https://github.com/triyatna/n8n-nodes-4discord",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/triyatna/n8n-nodes-discord.git"
+    "url": "git+https://github.com/triyatna/n8n-nodes-4discord.git"
   },
   "license": "MIT",
   "keywords": [
