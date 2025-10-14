@@ -1,6 +1,6 @@
 {
   "name": "@triyatna/n8n-nodes-4discord",
-  "version": "0.1.57",
+  "version": "0.1.63",
   "description": "Discord for n8n",
   "author": "triyatna",
   "homepage": "https://github.com/triyatna/n8n-nodes-discord",
@@ -69,7 +69,8 @@
       "dist/credentials/DiscordApp.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/DiscordTrigger.node.js"
+      "dist/nodes/DiscordInteractionsTrigger.node.js",
+      "dist/nodes/DiscordListenerTrigger.node.js"
     ]
   }
 }
