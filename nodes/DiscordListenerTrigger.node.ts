@@ -146,7 +146,7 @@ export class DiscordListenerTrigger implements INodeType {
   description: INodeTypeDescription = {
     displayName: "Discord Listener",
     name: "discordListenerTrigger",
-    icon: "file:icons/discord.svg",
+    icon: "file:../../icons/discord.svg",
     group: ["trigger"],
     version: 1,
     description: "Listen to Discord Listener Socket events.",
