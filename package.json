@@ -70,7 +70,6 @@
       "dist/credentials/DiscordApp.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/DiscordInteractionsTrigger.node.js",
       "dist/nodes/DiscordListenerTrigger.node.js"
     ]
   }
