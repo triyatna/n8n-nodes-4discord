@@ -1,12 +1,12 @@
 {
   "name": "@triyatna/n8n-nodes-4discord",
-  "version": "0.1.63",
+  "version": "0.1.72",
   "description": "Discord for n8n",
   "author": "triyatna",
-  "homepage": "https://github.com/triyatna/n8n-nodes-discord",
+  "homepage": "https://github.com/triyatna/n8n-nodes-4discord",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/triyatna/n8n-nodes-discord.git"
+    "url": "git+https://github.com/triyatna/n8n-nodes-4discord.git"
   },
   "license": "MIT",
   "keywords": [
@@ -37,6 +37,7 @@
   },
   "files": [
     "dist",
+    "icons",
     "LICENSE",
     "README.md"
   ],
@@ -69,7 +70,6 @@
       "dist/credentials/DiscordApp.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/DiscordInteractionsTrigger.node.js",
       "dist/nodes/DiscordListenerTrigger.node.js"
     ]
   }
